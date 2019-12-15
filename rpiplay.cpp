@@ -157,6 +157,12 @@ int main(int argc, char *argv[]) {
 }
 
 // Server callbacks
+extern "C" void stream_start(void *cls) {
+    printf("STREAM STARTS!\n");
+}
+extern "C" void stream_end(void* cls) {
+    printf("STREAM ENDS\n");
+}
 extern "C" void audio_process(void *cls, raop_ntp_t *ntp, aac_decode_struct *data) {
     if (audio_renderer != NULL) {
         audio_renderer_render_buffer(audio_renderer, ntp, data->data, data->data_len, data->pts);
@@ -214,6 +220,9 @@ int start_server(std::vector<char> hw_addr, std::string name, bool show_backgrou
     raop_cbs.audio_flush = audio_flush;
     raop_cbs.video_flush = video_flush;
     raop_cbs.audio_set_volume = audio_set_volume;
+
+    raop_cbs.stream_start = stream_start;
+    raop_cbs.stream_end = stream_end;
 
     raop = raop_init(10, &raop_cbs);
     if (raop == NULL) {

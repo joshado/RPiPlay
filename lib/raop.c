@@ -61,6 +61,8 @@ struct raop_conn_s {
 	unsigned char *remote;
 	int remotelen;
 
+	int running;
+
 };
 typedef struct raop_conn_s raop_conn_t;
 
@@ -168,6 +170,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response)
 		handler = &raop_handler_options;
 	} else if (!strcmp(method, "SETUP")) {
 		handler = &raop_handler_setup;
+		if(!conn->running && conn->raop_rtp) {
+			conn->running = 1;
+			conn->raop->callbacks.stream_start(conn->raop->callbacks.cls);
+		}
 	} else if (!strcmp(method, "GET_PARAMETER")) {
 		handler = &raop_handler_get_parameter;
 	} else if (!strcmp(method, "SET_PARAMETER")) {
@@ -204,6 +210,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response)
             raop_rtp_mirror_destroy(conn->raop_rtp_mirror);
             conn->raop_rtp_mirror = NULL;
         }
+    if( conn->running ) {
+    	conn->raop->callbacks.stream_end(conn->raop->callbacks.cls);
+    	conn->running = 0;
+    }
 	}
 	if (handler != NULL) {
 		handler(conn, request, *response, &response_data, &response_datalen);
@@ -222,6 +232,10 @@ conn_destroy(void *ptr)
 	raop_conn_t *conn = ptr;
 
     logger_log(conn->raop->logger, LOGGER_INFO, "Destroying connection");
+	if( conn->running ) {
+    conn->raop->callbacks.stream_end(conn->raop->callbacks.cls);
+    conn->running = 0;
+  }
 
     if (conn->raop_ntp) {
 	    raop_ntp_destroy(conn->raop_ntp);
