@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
             if (i == argc - 1) continue;
             server_name = std::string(argv[++i]);
         } else if (arg == "-b") {
-            show_background = !show_background;  
+            show_background = !show_background;
         } else if (arg == "-a") {
             if (i == argc - 1) continue;
             std::string audio_device_name(argv[++i]);
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
         server_hw_addr.clear();
         parse_hw_addr(mac_address, server_hw_addr);
     }
- 
+
     if (start_server(server_hw_addr, server_name, show_background, audio_device, low_latency, debug_log) != 0) {
         return 1;
     }
@@ -158,10 +158,16 @@ int main(int argc, char *argv[]) {
 
 // Server callbacks
 extern "C" void stream_start(void *cls) {
+    if (video_renderer) video_renderer_start(video_renderer);
+    if (audio_renderer) audio_renderer_start(audio_renderer);
+
     printf("STREAM STARTS!\n");
 }
 extern "C" void stream_end(void* cls) {
     printf("STREAM ENDS\n");
+    // If we don't destroy these two in the correct order, we get a deadlock from the ilclient library
+    if (audio_renderer) audio_renderer_destroy(audio_renderer);
+    if (video_renderer) video_renderer_destroy(video_renderer);
 }
 extern "C" void audio_process(void *cls, raop_ntp_t *ntp, aac_decode_struct *data) {
     if (audio_renderer != NULL) {
@@ -251,9 +257,6 @@ int start_server(std::vector<char> hw_addr, std::string name, bool show_backgrou
         return -1;
     }
 
-    if (video_renderer) video_renderer_start(video_renderer);
-    if (audio_renderer) audio_renderer_start(audio_renderer);
-
     unsigned short port = 0;
     raop_start(raop, &port);
     raop_set_port(raop, port);
@@ -266,7 +269,7 @@ int start_server(std::vector<char> hw_addr, std::string name, bool show_backgrou
     }
 
     raop_set_dnssd(raop, dnssd);
-    
+
     dnssd_register_raop(dnssd, port);
     dnssd_register_airplay(dnssd, port + 1);
 
@@ -277,8 +280,5 @@ int stop_server() {
     raop_destroy(raop);
     dnssd_unregister_raop(dnssd);
     dnssd_unregister_airplay(dnssd);
-    // If we don't destroy these two in the correct order, we get a deadlock from the ilclient library
-    audio_renderer_destroy(audio_renderer);
-    video_renderer_destroy(video_renderer);
     return 0;
 }
